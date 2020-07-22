@@ -86,7 +86,7 @@ typedef struct {
 bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path, CertificateChain *out_cert_chain, Ticket *out_ticket, TitleMetadata *out_tmd);
 
 /// Generates split DLC WAD packages from unpacked WAD data.
-bool wadGenerateSplitDlcPackages(os_char_t *unpacked_wad_path, os_char_t *out_path, CertificateChain *cert_chain, Ticket *ticket, TitleMetadata *tmd, u16 dlc_content_count);
+bool wadGenerateSplitDlcPackages(os_char_t *unpacked_wad_path, os_char_t *out_path, CertificateChain *cert_chain, Ticket *ticket, TitleMetadata *tmd, u16 dlc_content_idx);
 
 /// Byteswaps fields from an installable WAD package.
 ALWAYS_INLINE void wadByteswapInstallablePackageHeaderFields(WadInstallablePackageHeader *wad_header)

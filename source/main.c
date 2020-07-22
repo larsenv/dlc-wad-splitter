@@ -38,21 +38,21 @@ int main(int argc, char **argv)
     TitleMetadata *tmd = NULL;
     TmdCommonBlock *tmd_common_block = NULL;
     
-    u16 dlc_content_count = 0, tmd_content_count = 0;
+    u16 dlc_content_idx = 0, tmd_content_count = 0;
     
     printf("\ndlc-wad-splitter v%s (c) DarkMatterCore.\n", VERSION);
     printf("Built: %s %s.\n\n", __TIME__, __DATE__);
     
     if (argc != (PATH_COUNT + 2) || strlen(argv[1]) >= MAX_PATH || (strlen(argv[2]) + SPLIT_WAD_MAX_NAME_LENGTH) >= MAX_PATH || \
-        (dlc_content_count = (u16)strtoul(argv[3], NULL, 10)) >= (TMD_MAX_CONTENT_COUNT - 1) || errno == ERANGE)
+        (dlc_content_idx = (u16)strtoul(argv[3], NULL, 10)) >= (TMD_MAX_CONTENT_COUNT - 1) || errno == ERANGE)
     {
-        printf("Usage: %s <input WAD> <output dir> <content count per split DLC>\n\n", argv[0]);
+        printf("Usage: %s <input WAD> <output dir> <content index>\n\n", argv[0]);
         printf("Paths must not exceed %u characters. Relative paths are supported.\n", MAX_PATH - 1);
         printf("The input WAD package must hold a TMD with a valid signature, as well as all the contents referenced\n");
         printf("in the content records section from the TMD. If a single content is missing or has a wrong hash, the\n");
         printf("process will be stopped.\n");
         printf("Furthermore, the total content count minus 1 must be a multiple of the provided content count.\n");
-        printf("Output split DLC WADs will hold content #0 + \"content count\" contents.\n");
+        printf("Output split DLC WADs will hold content #0 + given index's contents and the one after that.\n");
         printf("For more information, please visit: https://github.com/DarkMatterCore/dlc-wad-splitter.\n\n");
         ret = -1;
         goto out;
@@ -125,7 +125,7 @@ int main(int argc, char **argv)
     tmd_common_block = tmdGetCommonBlock(tmd->data);
     tmd_content_count = bswap_16(tmd_common_block->content_count);
     
-    if (tmd_content_count <= 1 || dlc_content_count > (tmd_content_count - 1) || ((tmd_content_count - 1) % dlc_content_count) > 0)
+    if (tmd_content_count <= 1 || dlc_content_idx > (tmd_content_count - 1))
     {
         ERROR_MSG("Invalid TMD content count and/or content count per split DLC! (%u contents available).", tmd_content_count);
         ret = -6;
@@ -133,7 +133,7 @@ int main(int argc, char **argv)
     }
     
     /* Generate split DLC packages. */
-    if (!wadGenerateSplitDlcPackages(paths[2], paths[1], cert_chain, ticket, tmd, dlc_content_count))
+    if (!wadGenerateSplitDlcPackages(paths[2], paths[1], cert_chain, ticket, tmd, dlc_content_idx))
     {
         ret = -7;
         goto out;

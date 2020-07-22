@@ -81,7 +81,7 @@ static const u32 g_supportedDLCsCount = MAX_ELEMENTS(g_supportedDLCs);
 static bool wadIsSupportedDlcTitle(u64 tid);
 static bool wadUnpackContentFromInstallablePackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, u64 cnt_size, const u8 *cnt_hash, const os_char_t *out_path, u64 *out_aligned_cnt_size);
 static bool wadWriteUnpackedContentToPackage(FILE *wad_fd, const u8 *titlekey, const u8 *iv, mbedtls_sha1_context *sha1_ctx, FILE *cnt_fd, u16 cnt_idx, u64 cnt_size, u64 *out_aligned_cnt_size);
-static bool wadWriteSplitDlcPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, CertificateChain *cert_chain, Ticket *ticket, TitleMetadata *tmd, u16 dlc_content_count, u16 start_content_idx);
+static bool wadWriteSplitDlcPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, CertificateChain *cert_chain, Ticket *ticket, TitleMetadata *tmd, u16 dlc_content_idx);
 
 bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path, CertificateChain *out_cert_chain, Ticket *out_ticket, TitleMetadata *out_tmd)
 {
@@ -382,15 +382,14 @@ out:
     return success;
 }
 
-bool wadGenerateSplitDlcPackages(os_char_t *unpacked_wad_path, os_char_t *out_path, CertificateChain *cert_chain, Ticket *ticket, TitleMetadata *tmd, u16 dlc_content_count)
+bool wadGenerateSplitDlcPackages(os_char_t *unpacked_wad_path, os_char_t *out_path, CertificateChain *cert_chain, Ticket *ticket, TitleMetadata *tmd, u16 dlc_content_idx)
 {
     TmdCommonBlock *tmd_common_block = NULL;
     u16 tmd_content_count = 0;
     
     if (!unpacked_wad_path || !os_strlen(unpacked_wad_path) || !out_path || !os_strlen(out_path) || !cert_chain || !cert_chain->raw_chain || \
         !cert_chain->raw_chain_size || !ticket || !ticket->size || !ticket->data || !tmd || !tmd->size || !tmd->data || !(tmd_common_block = tmdGetCommonBlock(tmd->data)) || \
-        (tmd_content_count = bswap_16(tmd_common_block->content_count)) <= 1 || tmd_content_count > TMD_MAX_CONTENT_COUNT || dlc_content_count > (tmd_content_count - 1) || \
-        ((tmd_content_count - 1) % dlc_content_count) > 0)
+        (tmd_content_count = bswap_16(tmd_common_block->content_count)) <= 1 || tmd_content_count > TMD_MAX_CONTENT_COUNT || dlc_content_idx > (tmd_content_count - 1))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
@@ -398,14 +397,10 @@ bool wadGenerateSplitDlcPackages(os_char_t *unpacked_wad_path, os_char_t *out_pa
     
     bool success = true;
     
-    for(u16 i = 1; i < tmd_content_count; i += dlc_content_count)
+    if (!wadWriteSplitDlcPackage(unpacked_wad_path, out_path, cert_chain, ticket, tmd, dlc_content_idx))
     {
-        if (!wadWriteSplitDlcPackage(unpacked_wad_path, out_path, cert_chain, ticket, tmd, dlc_content_count, i))
-        {
-            ERROR_MSG("Failed to generate split DLC WAD from %u content(s) starting at index %u!", dlc_content_count, i);
-            success = false;
-            break;
-        }
+        ERROR_MSG("Failed to generate split DLC WAD from starting at index %u!", dlc_content_idx);
+        success = false;
     }
     
     return success;
@@ -633,7 +628,7 @@ out:
     return success;
 }
 
-static bool wadWriteSplitDlcPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, CertificateChain *cert_chain, Ticket *ticket, TitleMetadata *tmd, u16 dlc_content_count, u16 start_content_idx)
+static bool wadWriteSplitDlcPackage(os_char_t *unpacked_wad_path, os_char_t *out_path, CertificateChain *cert_chain, Ticket *ticket, TitleMetadata *tmd, u16 start_content_idx)
 {
     size_t unpacked_wad_path_len = 0, out_path_len = 0;
     TmdCommonBlock *tmd_common_block = NULL;
@@ -641,16 +636,15 @@ static bool wadWriteSplitDlcPackage(os_char_t *unpacked_wad_path, os_char_t *out
     
     if (!unpacked_wad_path || !(unpacked_wad_path_len = os_strlen(unpacked_wad_path)) || !out_path || !(out_path_len = os_strlen(out_path)) || !cert_chain || !cert_chain->raw_chain || \
         !cert_chain->raw_chain_size || !ticket || !ticket->size || !ticket->data || !tmd || !tmd->size || !tmd->data || !(tmd_common_block = tmdGetCommonBlock(tmd->data)) || \
-        (tmd_content_count = bswap_16(tmd_common_block->content_count)) <= 1 || tmd_content_count > TMD_MAX_CONTENT_COUNT || dlc_content_count > (tmd_content_count - 1) || \
-        ((tmd_content_count - 1) % dlc_content_count) > 0 || !start_content_idx || start_content_idx > (tmd_content_count - dlc_content_count))
+        (tmd_content_count = bswap_16(tmd_common_block->content_count)) <= 1 || tmd_content_count > TMD_MAX_CONTENT_COUNT || start_content_idx > (tmd_content_count - 1) || \
+        !start_content_idx || start_content_idx > (tmd_content_count - start_content_idx))
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
     
     FILE *wad_fd = NULL;
-    u16 wad_idx = start_content_idx;
-    if (dlc_content_count > 1) wad_idx = ((wad_idx / dlc_content_count) + 1);
+    printf("start: %i", start_content_idx);
     WadInstallablePackageHeader wad_header = {0};
     
     TmdContentRecord *tmd_contents = tmdGetTitleMetadataContentRecords(tmd_common_block);
@@ -668,8 +662,8 @@ static bool wadWriteSplitDlcPackage(os_char_t *unpacked_wad_path, os_char_t *out
     title_id = bswap_64(tmd_common_block->title_id);
     
     /* Generate output path. */
-    os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "%016" PRIx64 "_split_%u.wad", title_id, wad_idx);
-    
+    os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "%016" PRIx64 "_split_%u.wad", title_id, start_content_idx);
+
     /* Open output file. */
     wad_fd = os_fopen(out_path, OS_MODE_WRITE);
     if (!wad_fd)
@@ -685,14 +679,16 @@ static bool wadWriteSplitDlcPackage(os_char_t *unpacked_wad_path, os_char_t *out
     wad_header.cert_chain_size = (u32)cert_chain->raw_chain_size;
     wad_header.ticket_size = (u32)ticket->size;
     wad_header.tmd_size = (u32)tmd->size;
-    
+
+    u16 wad_toc[3] = {0, start_content_idx, start_content_idx + 1};
+
     /* Calculate data size. */
-    for(u16 i = 0; i < (dlc_content_count + 1); i++)
+    for (u16 i = 0; i < 3; i++)
     {
-        u16 rec_idx = ((i == 0 ? 0 : (start_content_idx - 1)) + i);
+        u16 rec_idx = wad_toc[i];
         wad_header.data_size += ALIGN_UP(bswap_64(tmd_contents[rec_idx].size), WAD_BLOCK_SIZE);
     }
-    
+
     /* Byteswap installable WAD header fields. */
     wadByteswapInstallablePackageHeaderFields(&wad_header);
     
@@ -727,12 +723,12 @@ static bool wadWriteSplitDlcPackage(os_char_t *unpacked_wad_path, os_char_t *out
         ERROR_MSG("Failed to write TMD to \"" OS_PRINT_STR "\"!", out_path);
         goto out;
     }
-    
+
     /* Write contents. */
-    for(u16 i = 0; i < (dlc_content_count + 1); i++)
+    for (u16 i = 0; i < 3; i++)
     {
         FILE *cnt_fd = NULL;
-        u16 rec_idx = ((i == 0 ? 0 : (start_content_idx - 1)) + i);
+        u16 rec_idx = wad_toc[i];
         u16 cnt_idx = bswap_16(tmd_contents[rec_idx].index);
         u64 cnt_size = bswap_64(tmd_contents[rec_idx].size);
         u64 aligned_cnt_size = 0;
@@ -766,9 +762,9 @@ static bool wadWriteSplitDlcPackage(os_char_t *unpacked_wad_path, os_char_t *out
             goto out;
         }
     }
-    
-    printf("Successfully saved split DLC WAD package #%u to \"" OS_PRINT_STR "\".\n\n", wad_idx, out_path);
-    
+
+    printf("Successfully saved split DLC WAD package #%u to \"" OS_PRINT_STR "\".\n\n", start_content_idx, out_path);
+
     success = true;
     
 out:
