@@ -349,11 +349,11 @@ bool wadUnpackInstallablePackage(const os_char_t *wad_path, os_char_t *out_path,
         os_snprintf(out_path + out_path_len, MAX_PATH - out_path_len, OS_PATH_SEPARATOR "%08" PRIx16 ".app", tmd_contents[i].index);
         
         /* Unpack content. */
-        if (!wadUnpackContentFromInstallablePackage(wad_fd, out_ticket->titlekey, cnt_iv, tmd_contents[i].size, tmd_contents[i].hash, out_path, &aligned_cnt_size))
+        /*if (!wadUnpackContentFromInstallablePackage(wad_fd, out_ticket->titlekey, cnt_iv, tmd_contents[i].size, tmd_contents[i].hash, out_path, &aligned_cnt_size))
         {
             ERROR_MSG("Failed to save decrypted content file \"%08" PRIx16 ".app\" from \"" OS_PRINT_STR "\"!", tmd_contents[i].index, wad_path);
             goto out;
-        }
+        }*/
         
         /* Update WAD offset. */
         wad_offset += aligned_cnt_size;
@@ -637,14 +637,13 @@ static bool wadWriteSplitDlcPackage(os_char_t *unpacked_wad_path, os_char_t *out
     if (!unpacked_wad_path || !(unpacked_wad_path_len = os_strlen(unpacked_wad_path)) || !out_path || !(out_path_len = os_strlen(out_path)) || !cert_chain || !cert_chain->raw_chain || \
         !cert_chain->raw_chain_size || !ticket || !ticket->size || !ticket->data || !tmd || !tmd->size || !tmd->data || !(tmd_common_block = tmdGetCommonBlock(tmd->data)) || \
         (tmd_content_count = bswap_16(tmd_common_block->content_count)) <= 1 || tmd_content_count > TMD_MAX_CONTENT_COUNT || start_content_idx > (tmd_content_count - 1) || \
-        !start_content_idx || start_content_idx > (tmd_content_count - start_content_idx))
+        !start_content_idx)
     {
         ERROR_MSG("Invalid parameters!");
         return false;
     }
-    
+
     FILE *wad_fd = NULL;
-    printf("start: %i", start_content_idx);
     WadInstallablePackageHeader wad_header = {0};
     
     TmdContentRecord *tmd_contents = tmdGetTitleMetadataContentRecords(tmd_common_block);

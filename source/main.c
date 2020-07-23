@@ -111,7 +111,7 @@ int main(int argc, char **argv)
             }
         }
     }
-    
+
     /* Unpack input WAD package. */
     if (!wadUnpackInstallablePackage(paths[0], paths[2], cert_chain, ticket, tmd))
     {
@@ -163,7 +163,7 @@ out:
     }
     
     /* Remove unpacked WAD directory. */
-    if (paths[2]) utilsRemoveDirectoryRecursively(paths[2]);
+    // if (paths[2]) utilsRemoveDirectoryRecursively(paths[2]);
     
     for(u32 i = 0; i <= PATH_COUNT; i++)
     {
